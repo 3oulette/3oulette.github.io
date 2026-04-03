@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sauvageonne Mégève — Comparatif N-1 / N / Budget</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a0f; color: #c8c8d0; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+:root {
+  --background: #0a0a0f; --surface: #12121a; --surface2: #1a1a25;
+  --border: #252530; --text: #c8c8d0; --text-dim: #6b6b78; --text-bright: #f0f0f5;
+  --accent: #4ecdc4; --red: #ff6b6b; --green: #51cf66; --orange: #ffa94d;
+  --blue: #74b9ff; --yellow: #ffd43b;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #f5f5f0; --surface: #ffffff; --surface2: #f0f0eb;
+    --border: #ddd; --text: #333; --text-dim: #888; --text-bright: #111;
+    --accent: #0891b2; --red: #dc2626; --green: #16a34a;
+    --orange: #d97706; --blue: #2563eb; --yellow: #854d0e;
+  }
+  body { background: var(--background); color: var(--text); }
+}
+.pill { 
+  padding: 4px 12px; border-radius: 4px; cursor: pointer; 
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-dim); font-size: 11px; font-family: inherit;
+  transition: all 0.15s;
+}
+.pill.active { background: var(--accent); color: #0a0a0f; border-color: var(--accent); font-weight: 600; }
+.pill:hover:not(.active) { border-color: var(--text-dim); color: var(--text); }
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th, .tbl td { padding: 5px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.tbl th { color: var(--text-dim); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; background: var(--surface); z-index: 2; }
+.tbl td:first-child, .tbl th:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 200px; }
+.tbl th:first-child { z-index: 3; }
+.row-revenue td { color: var(--accent); font-weight: 600; }
+.row-subtotal td { color: var(--text-bright); font-weight: 600; border-top: 2px solid var(--border); }
+.row-total td { color: var(--yellow); font-weight: 700; border-top: 2px double var(--text-dim); border-bottom: 2px double var(--text-dim); }
+.row-detail td { color: var(--text-dim); font-size: 11px; }
+.row-detail td:first-child { padding-left: 16px; }
+.row-cost td { color: var(--text); }
+.ecart-pos { color: var(--green) !important; }
+.ecart-neg { color: var(--red) !important; }
+.ecart-zero { color: var(--text-dim) !important; }
+.col-sep { border-left: 2px solid var(--accent) !important; }
+.month-slider { 
+  -webkit-appearance: none; width: 100%; height: 4px; 
+  background: var(--border); border-radius: 2px; outline: none; flex: 1;
+}
+.month-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  background: var(--accent); border-radius: 50%; cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const MONTHS = ["Nov","Déc","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct"];
+
+const RAW = {
+  "N-1": {
+    period: "11/2024 → 10/2025",
+    rows: [
+      { label: "Chiffre d'affaires", cat: "revenue", values: [0,407832,450529,517146,286287,45506,0,0,0,0,0,0,1707298] },
+      { label: "Achats matières & fourn.", cat: "cost", values: [-5607,-101730,-131893,-94789,-184791,110527,0,442,0,-982,-12682,8594,-412911] },
+      { label: "Marge brute", cat: "subtotal", values: [-5607,306102,318636,422357,101495,156033,0,442,0,-982,-12682,8594,1294387] },
+      { label: "Frais de personnel", cat: "cost", values: [-6392,-101090,-112438,-113153,-102040,-4704,-600,-600,0,-600,-1200,4186,-438631] },
+      { label: "  dont Rémunérations", cat: "detail", values: [-3930,-61414,-63406,-66737,-65055,-3524,0,0,0,0,0,0,-264065] },
+      { label: "  dont Charges sociales", cat: "detail", values: [-1862,-16517,-18699,-17877,-21267,-1646,0,0,0,0,0,0,-77869] },
+      { label: "  dont Logement personnel", cat: "detail", values: [-600,-23159,-30333,-28540,-15718,466,-600,-600,0,-600,-1200,4186,-96698] },
+      { label: "Impôts et taxes", cat: "cost", values: [-2,-3113,-4194,-614,-614,-582,-3154,0,-580,-580,0,-4730,-18163] },
+      { label: "Charges externes", cat: "cost", values: [-14060,-118702,-137927,-109017,-83423,-38852,-3634,-4470,-3872,-10688,-4691,-35836,-565173] },
+      { label: "  dont Fournitures & énergie", cat: "detail", values: [-347,-2636,-4731,-4860,-6509,-2135,-534,-470,-370,-378,-1514,-313,-24797] },
+      { label: "  dont Autres charges ext.", cat: "detail", values: [-5428,-47449,-57276,-46167,-18234,-28625,-330,-193,-389,-555,-406,-492,-205543] },
+      { label: "  dont Loyers", cat: "detail", values: [-300,-12416,-10503,-10500,-12289,-495,-150,-150,-1151,-150,-300,-4025,-52431] },
+      { label: "  dont Entretien & maint.", cat: "detail", values: [-5161,-6358,-8348,-4491,-5511,-2794,-431,-698,-431,-431,-698,-3548,-38899] },
+      { label: "  dont Assurances", cat: "detail", values: [-874,-704,-704,-704,-704,-702,-702,-702,-923,-722,-702,-766,-8909] },
+      { label: "  dont Prestation IG", cat: "detail", values: [0,-24697,-25000,-25000,-25000,0,0,0,0,0,0,-22984,-122681] },
+      { label: "  dont Honoraires", cat: "detail", values: [-564,-606,-1152,-777,-957,-537,-535,-405,-450,-7430,-950,-430,-14793] },
+      { label: "  dont Publicité", cat: "detail", values: [-250,-17208,-18281,-7198,-5421,-1746,-778,-900,0,-900,0,-2750,-55433] },
+      { label: "  dont Déplacements", cat: "detail", values: [-972,-2382,-3667,-2108,-5185,-863,0,0,0,0,0,-429,-15605] },
+      { label: "  dont Frais bancaires", cat: "detail", values: [-120,-4152,-8004,-6996,-3441,-849,-83,-862,-69,-32,-31,-72,-24710] },
+      { label: "Autres prod. & charges expl.", cat: "cost", values: [2,-2,-471,2,-2,-2,-1,1,1,-1,0,-228,-700] },
+      { label: "EBITDA", cat: "total", values: [-26060,83195,63605,199575,-84583,111893,-7388,-4627,-4452,-12851,-18573,-28013,271720] },
+      { label: "Dot./reprises amort. & prov.", cat: "cost", values: [0,-42000,-42000,-42000,-42000,0,0,0,0,0,0,0,-168000] },
+      { label: "Résultat d'exploitation", cat: "subtotal", values: [-26060,41195,21605,157575,-126583,111893,-7388,-4627,-4452,-12851,-18573,-28013,103720] },
+      { label: "Résultat financier", cat: "cost", values: [-407,0,-221,-375,-364,-353,-342,-331,-321,-310,-299,-29728,-33051] },
+      { label: "Résultat exceptionnel", cat: "cost", values: [0,0,-39529,0,618,0,0,-686,0,0,0,1538,-38059] },
+      { label: "IS et participation", cat: "cost", values: [0,0,0,0,0,0,0,0,0,0,0,0,0] },
+      { label: "Résultat net", cat: "total", values: [-26467,41195,-18144,157200,-126329,111540,-7731,-5645,-4772,-13161,-18872,-56204,32610] },
+    ]
+  },
+  "N": {
+    period: "11/2025 → 10/2026",
+    rows: [
+      { label: "Chiffre d'affaires", cat: "revenue", values: [0,500386,542271,466245,285913,0,0,0,0,0,0,0,1794815] },
+      { label: "Achats matières & fourn.", cat: "cost", values: [-7475,-137133,-115430,-121200,-82046,0,0,0,0,0,0,0,-463285] },
+      { label: "Marge brute", cat: "subtotal", values: [-7475,363253,426840,345045,203867,0,0,0,0,0,0,0,1331530] },
+      { label: "Frais de personnel", cat: "cost", values: [-18221,-117500,-125747,-111044,-85841,0,0,0,0,0,0,0,-458353] },
+      { label: "  dont Rémunérations", cat: "detail", values: [-16333,-70473,-73674,-61494,-61720,0,0,0,0,0,0,0,-283694] },
+      { label: "  dont Charges sociales", cat: "detail", values: [-1288,-16360,-18184,-18884,-1295,0,0,0,0,0,0,0,-56010] },
+      { label: "  dont Logement personnel", cat: "detail", values: [-600,-30667,-33889,-30667,-22827,0,0,0,0,0,0,0,-118650] },
+      { label: "Impôts et taxes", cat: "cost", values: [-2269,-1992,-16165,-60,-2455,0,0,0,0,0,0,0,-22941] },
+      { label: "Charges externes", cat: "cost", values: [-66632,-159156,-131389,-120213,-119062,-183,0,0,0,0,0,0,-596636] },
+      { label: "  dont Fournitures & énergie", cat: "detail", values: [-500,-2880,-4672,-6011,-4468,0,0,0,0,0,0,0,-18531] },
+      { label: "  dont Autres charges ext.", cat: "detail", values: [-15715,-60406,-51418,-52350,-42725,0,0,0,0,0,0,0,-222614] },
+      { label: "  dont Loyers", cat: "detail", values: [-150,-10500,-11668,-10500,-11659,0,0,0,0,0,0,0,-44477] },
+      { label: "  dont Entretien & maint.", cat: "detail", values: [-42483,-27416,-11676,-3340,-21624,0,0,0,0,0,0,0,-106540] },
+      { label: "  dont Assurances", cat: "detail", values: [-1023,-829,-829,-805,-805,0,0,0,0,0,0,0,-4291] },
+      { label: "  dont Prestation IG", cat: "detail", values: [0,-35064,-37959,-32726,-28292,0,0,0,0,0,0,0,-134041] },
+      { label: "  dont Honoraires", cat: "detail", values: [-638,-1494,-443,-3020,-697,0,0,0,0,0,0,0,-6292] },
+      { label: "  dont Publicité", cat: "detail", values: [-5790,-15271,-5181,-3585,-3090,0,0,0,0,0,0,0,-32917] },
+      { label: "  dont Déplacements", cat: "detail", values: [-116,-366,0,0,-605,0,0,0,0,0,0,0,-1087] },
+      { label: "  dont Frais bancaires", cat: "detail", values: [-53,-4595,-7416,-7607,-4933,-183,0,0,0,0,0,0,-24787] },
+      { label: "Autres prod. & charges expl.", cat: "cost", values: [40,1,4510,-5,0,0,0,0,0,0,0,592,5138] },
+      { label: "EBITDA", cat: "total", values: [-94558,84605,158050,113723,-3491,-183,0,0,0,0,0,592,258738] },
+      { label: "Dot./reprises amort. & prov.", cat: "cost", values: [0,-42800,-42800,-42800,-42800,0,0,0,0,0,0,0,-171200] },
+      { label: "Résultat d'exploitation", cat: "subtotal", values: [-94558,41805,115250,70923,-46291,-183,0,0,0,0,0,592,87538] },
+      { label: "Résultat financier", cat: "cost", values: [-277,-266,-255,-244,-233,-222,-211,-200,-190,-179,-169,-159,-2605] },
+      { label: "Résultat exceptionnel", cat: "cost", values: [0,0,0,0,2103,0,0,0,0,0,0,0,2103] },
+      { label: "IS et participation", cat: "cost", values: [0,0,0,0,0,0,0,0,0,0,0,0,0] },
+      { label: "Résultat net", cat: "total", values: [-94835,41539,114995,70679,-44421,-405,-211,-200,-190,-179,-169,433,87036] },
+    ]
+  },
+  "Budget": {
+    period: "11/2025 → 10/2026",
+    rows: [
+      { label: "Chiffre d'affaires", cat: "revenue", values: [0,616999,560999,573000,316999,0,0,0,0,0,0,0,2067997] },
+      { label: "Achats matières & fourn.", cat: "cost", values: [0,-141054,-128253,-130995,-72469,0,0,0,0,0,0,0,-472771] },
+      { label: "Marge brute", cat: "subtotal", values: [0,475945,432746,442005,244530,0,0,0,0,0,0,0,1595226] },
+      { label: "Frais de personnel", cat: "cost", values: [-5488,-107491,-111699,-108477,-99887,-5488,0,0,0,0,0,0,-438530] },
+      { label: "  dont Rémunérations", cat: "detail", values: [-4281,-60388,-61157,-61157,-61157,-4281,0,0,0,0,0,0,-252421] },
+      { label: "  dont Charges sociales", cat: "detail", values: [-1207,-17036,-17253,-17253,-17253,-1207,0,0,0,0,0,0,-71209] },
+      { label: "  dont Logement personnel", cat: "detail", values: [0,-30067,-33289,-30067,-21477,0,0,0,0,0,0,0,-114900] },
+      { label: "Impôts et taxes", cat: "cost", values: [-2,-3113,-4194,-641,-641,-583,-3154,0,-580,-580,0,-4730,-18218] },
+      { label: "Charges externes", cat: "cost", values: [-13997,-152304,-157215,-134917,-102023,-10785,-3633,-4470,-3873,-10640,-4615,-12852,-611324] },
+      { label: "  dont Fournitures & énergie", cat: "detail", values: [-347,-2636,-4731,-4860,-6509,-2135,-534,-470,-370,-378,-1514,-313,-24797] },
+      { label: "  dont Autres charges ext.", cat: "detail", values: [-5428,-57396,-61551,-54405,-38369,-622,-330,-193,-389,-507,-330,-492,-220012] },
+      { label: "  dont Loyers", cat: "detail", values: [-300,-12416,-10504,-10500,-12289,-495,-150,-150,-1151,-150,-300,-4025,-52430] },
+      { label: "  dont Entretien & maint.", cat: "detail", values: [-5162,-6358,-8349,-4491,-5511,-2795,-431,-698,-431,-431,-698,-3548,-38903] },
+      { label: "  dont Assurances", cat: "detail", values: [-874,-704,-704,-704,-704,-702,-702,-702,-923,-722,-702,-766,-8909] },
+      { label: "  dont Prestation IG", cat: "detail", values: [0,-43190,-39270,-40110,-22190,0,0,0,0,0,0,0,-144760] },
+      { label: "  dont Honoraires", cat: "detail", values: [-564,-606,-1152,-777,-957,-537,-535,-405,-450,-7430,-950,-430,-14793] },
+      { label: "  dont Publicité", cat: "detail", values: [-250,-18460,-19474,-9202,-5903,-1746,-778,-900,0,-900,0,-2750,-60363] },
+      { label: "  dont Déplacements", cat: "detail", values: [-972,-2383,-3668,-2108,-5185,-863,0,0,0,0,0,-429,-15608] },
+      { label: "  dont Frais bancaires", cat: "detail", values: [-56,-8061,-7552,-7545,-4236,-783,-83,-862,-69,-32,-31,-72,-29382] },
+      { label: "Autres prod. & charges expl.", cat: "cost", values: [0,-5,0,-1,-1,-1,0,-1,0,-1,0,0,-10] },
+      { label: "EBITDA", cat: "total", values: [-19487,213032,159638,197969,41978,-16857,-6787,-4471,-4453,-11221,-4615,-17582,527144] },
+      { label: "Dot./reprises amort. & prov.", cat: "cost", values: [0,-42800,-42800,-42800,-42800,0,0,0,0,0,0,0,-171200] },
+      { label: "Résultat d'exploitation", cat: "subtotal", values: [-19487,170232,116838,155169,-822,-16857,-6787,-4471,-4453,-11221,-4615,-17582,355944] },
+      { label: "Résultat financier", cat: "cost", values: [-217,-15217,-15217,-15217,-15217,-217,-217,-217,-217,-217,-217,-217,-62600] },
+      { label: "Résultat exceptionnel", cat: "cost", values: [0,0,0,0,0,0,0,0,0,0,0,0,0] },
+      { label: "IS et participation", cat: "cost", values: [0,0,0,0,0,0,0,0,0,0,0,0,0] },
+      { label: "Résultat net", cat: "total", values: [-19704,155015,101621,139952,-16039,-17074,-7004,-4688,-4670,-11438,-4832,-17799,293344] },
+    ]
+  }
+};
+
+const fmt = (v) => {
+  if (v === 0 || v === null || v === undefined) return "-";
+  const abs = Math.abs(Math.round(v));
+  const s = abs.toLocaleString("fr-FR");
+  return v < 0 ? "(" + s + ")" : s;
+};
+const fmtK = (v) => {
+  if (v === 0 || v === null || v === undefined) return "-";
+  const abs = Math.abs(Math.round(v / 1000));
+  const s = abs.toLocaleString("fr-FR");
+  return v < 0 ? "(" + s + ")" : s;
+};
+const fmtPct = (v) => {
+  if (v === null || v === undefined || !isFinite(v)) return "-";
+  const abs = Math.abs(v * 100);
+  const s = abs.toFixed(1) + "%";
+  return v < 0 ? "(" + s + ")" : s;
+};
+const computeCumul = (values, upToMonth) => values.slice(0, upToMonth + 1).reduce((a, b) => a + b, 0);
+
+function App() {
+  const [viewMode, setViewMode] = useState("cumul");
+  const [selectedMonth, setSelectedMonth] = useState(4);
+  const [showDetail, setShowDetail] = useState(false);
+  const [displayUnit, setDisplayUnit] = useState("€");
+  const formatter = displayUnit === "K€" ? fmtK : fmt;
+
+  const getVal = (dataset, rowIdx, monthIdx) => {
+    const row = RAW[dataset]?.rows[rowIdx];
+    if (!row) return 0;
+    if (viewMode === "cumul") return computeCumul(row.values, monthIdx);
+    if (viewMode === "total") return row.values[12];
+    return row.values[monthIdx];
+  };
+
+  const rows = RAW["N-1"].rows;
+  const visibleRows = useMemo(() => {
+    if (showDetail) return rows.map((_, i) => i);
+    return rows.map((r, i) => ({ ...r, i })).filter(r => r.cat !== "detail").map(r => r.i);
+  }, [showDetail]);
+
+  const activeMonth = viewMode === "total" ? 12 : selectedMonth;
+
+  return (
+    <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-bright)", letterSpacing: "-0.5px" }}>SAUVAGEONNE MÉGÈVE</h1>
+          <p style={{ color: "var(--text-dim)", fontSize: 11, marginTop: 2 }}>Compte de résultat comparatif — N-1 retraité / N / Budget</p>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button className={"pill " + (displayUnit === "€" ? "active" : "")} onClick={() => setDisplayUnit("€")}>€</button>
+          <button className={"pill " + (displayUnit === "K€" ? "active" : "")} onClick={() => setDisplayUnit("K€")}>K€</button>
+          <span style={{ width: 1, background: "var(--border)", margin: "0 4px" }}/>
+          <button className={"pill " + (showDetail ? "active" : "")} onClick={() => setShowDetail(!showDetail)}>
+            {showDetail ? "▾ Détail" : "▸ Détail"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button className={"pill " + (viewMode === "cumul" ? "active" : "")} onClick={() => setViewMode("cumul")}>Cumul</button>
+        <button className={"pill " + (viewMode === "mensuel" ? "active" : "")} onClick={() => setViewMode("mensuel")}>Mensuel</button>
+        <button className={"pill " + (viewMode === "total" ? "active" : "")} onClick={() => setViewMode("total")}>Total exercice</button>
+      </div>
+
+      {viewMode !== "total" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "8px 12px", background: "var(--surface)", borderRadius: 6, border: "1px solid var(--border)" }}>
+          <span style={{ color: "var(--text-dim)", fontSize: 10, minWidth: 60 }}>{viewMode === "cumul" ? "Cumul →" : "Mois :"}</span>
+          <input type="range" min={0} max={11} value={selectedMonth} className="month-slider" onChange={(e) => setSelectedMonth(Number(e.target.value))} />
+          <span style={{ color: "var(--accent)", fontWeight: 600, minWidth: 30 }}>{MONTHS[selectedMonth]}</span>
+        </div>
+      )}
+
+      <div style={{ overflow: "auto", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface)" }}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th style={{ minWidth: 200 }}>{viewMode === "cumul" ? "Cumul Nov → " + MONTHS[selectedMonth] : viewMode === "mensuel" ? MONTHS[selectedMonth] : "Total exercice"}</th>
+              <th>N-1</th><th>N</th><th>Budget</th>
+              <th className="col-sep">Δ N vs N-1</th><th>Δ %</th>
+              <th className="col-sep">Δ N vs Bdg</th><th>Δ %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((rowIdx) => {
+              const row = rows[rowIdx];
+              const vN1 = getVal("N-1", rowIdx, activeMonth);
+              const vN = getVal("N", rowIdx, activeMonth);
+              const vB = getVal("Budget", rowIdx, activeMonth);
+              const dNN1 = vN - vN1;
+              const dNB = vN - vB;
+              const isPositiveGood = (row.cat === "revenue" || row.cat === "subtotal" || row.cat === "total");
+              const getEcartClass = (delta) => {
+                if (Math.abs(delta) < 1) return "ecart-zero";
+                if (isPositiveGood) return delta > 0 ? "ecart-pos" : "ecart-neg";
+                return delta > 0 ? "ecart-neg" : "ecart-pos";
+              };
+              const pctNN1 = vN1 !== 0 ? dNN1 / Math.abs(vN1) : null;
+              const pctNB = vB !== 0 ? dNB / Math.abs(vB) : null;
+              return (
+                <tr key={rowIdx} className={"row-" + row.cat}>
+                  <td>{row.label}</td>
+                  <td>{formatter(vN1)}</td><td>{formatter(vN)}</td><td>{formatter(vB)}</td>
+                  <td className={"col-sep " + getEcartClass(dNN1)}>{formatter(dNN1)}</td>
+                  <td className={getEcartClass(dNN1)}>{fmtPct(pctNN1)}</td>
+                  <td className={"col-sep " + getEcartClass(dNB)}>{formatter(dNB)}</td>
+                  <td className={getEcartClass(dNB)}>{fmtPct(pctNB)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 16 }}>
+        {(() => {
+          const caN = getVal("N", 0, activeMonth);
+          const caN1 = getVal("N-1", 0, activeMonth);
+          const mbN = getVal("N", 2, activeMonth);
+          const ebitdaN = getVal("N", 20, activeMonth);
+          const ebitdaB = getVal("Budget", 20, activeMonth);
+          const rnN = getVal("N", rows.length - 1, activeMonth);
+          const cards = [
+            { title: "CA N", value: formatter(caN), sub: "vs N-1: " + (caN1 !== 0 ? ((caN/caN1-1)*100).toFixed(1)+"%" : "-"), color: "var(--accent)" },
+            { title: "Taux MB", value: caN !== 0 ? (mbN/caN*100).toFixed(1)+"%" : "-", sub: "MB = " + formatter(mbN), color: "var(--blue)" },
+            { title: "EBITDA N", value: formatter(ebitdaN), sub: "Bdg: " + formatter(ebitdaB), color: ebitdaN >= ebitdaB ? "var(--green)" : "var(--red)" },
+            { title: "Résultat net N", value: formatter(rnN), sub: "", color: rnN >= 0 ? "var(--green)" : "var(--red)" },
+          ];
+          return cards.map((c, i) => (
+            <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>{c.title}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: c.color }}>{c.value}</div>
+              {c.sub && <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{c.sub}</div>}
+            </div>
+          ));
+        })()}
+      </div>
+
+      <div style={{ marginTop: 16, fontSize: 10, color: "var(--text-dim)", textAlign: "center" }}>
+        Sauvageonne Mégève — Exercice 11/2025 → 10/2026 • Vert = favorable • Rouge = défavorable • Montants HT en {displayUnit}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(React.createElement(App), document.getElementById("root"));
+</script>
+</body>
+</html>
